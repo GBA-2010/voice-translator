@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  
+  <!-- PWA Settings -->
+  <link rel="manifest" href="./manifest.json">
+  <meta name="theme-color" content="#4ECDC4">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Translator">
+
+  <title>Russian-Chinese Voice Translator</title>
+  
+  <!-- Babel for in-browser compilation -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    :root {
+      --color-opponent: #FF6B6B; /* Soft Red for Top/Chinese */
+      --color-user: #4ECDC4;    /* Teal for Bottom/Russian */
+      --color-text: #FFFFFF;
+      --color-active: rgba(255, 255, 255, 0.2);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none; /* Prevent text selection during hold */
+      -webkit-user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+      height: 100%;
+      width: 100%;
+      overflow: hidden; /* Prevent scrolling completely */
+      overscroll-behavior: none; /* Disable pull-to-refresh on Android */
+      position: fixed; /* Lock the body in place */
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: #333;
+    }
+
+    #root {
+      height: 100%;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Common Half Styles */
+    .split-half {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      position: relative;
+      transition: background-color 0.3s ease;
+      overflow: hidden;
+    }
+
+    /* Top Half (Chinese) */
+    .top-half {
+      background-color: var(--color-opponent);
+      transform: rotate(180deg); /* Rotate for opponent facing user */
+      border-top: 1px solid rgba(0,0,0,0.1);
+    }
+
+    /* Bottom Half (Russian) */
+    .bottom-half {
+      background-color: var(--color-user);
+    }
+
+    /* Content Container */
+    .content-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      width: 100%;
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .translation-text {
+      font-size: 2rem;
+      font-weight: bold;
+      color: var(--color-text);
+      word-break: break-word;
+      line-height: 1.2;
+      margin-bottom: 10px;
+      min-height: 2.4rem;
+    }
+
+    .original-text {
+      font-size: 1rem;
+      color: rgba(255, 255, 255, 0.8);
+      font-weight: normal;
+    }
+
+    /* Push-to-Talk Button */
+    .mic-button {
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      background-color: rgba(255, 255, 255, 0.2);
+      border: 4px solid white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      touch-action: none; /* CRITICAL: Prevents browser gestures on button */
+    }
+
+    .mic-button:active, .mic-button.active {
+      transform: scale(0.95);
+      background-color: rgba(255, 255, 255, 0.4);
+      box-shadow: 0 0 0 20px rgba(255, 255, 255, 0.1);
+    }
+
+    .mic-button.listening {
+      animation: ripple 1.5s infinite;
+      background-color: #ff4757; /* Indicator color when listening */
+      border-color: #ff4757;
+    }
+    
+    .bottom-half .mic-button.listening {
+      background-color: #2f3542;
+      border-color: #2f3542;
+    }
+
+    @keyframes ripple {
+      0% {
+        box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.4);
+      }
+      70% {
+        box-shadow: 0 0 0 30px rgba(255, 255, 255, 0);
+      }
+      100% {
+        box-shadow: 0 0 0 0 rgba(255, 255, 255, 0);
+      }
+    }
+
+    .mic-icon {
+      width: 50px;
+      height: 50px;
+      fill: white;
+      pointer-events: none;
+    }
+
+    .status-label {
+      margin-top: 15px;
+      color: white;
+      font-size: 0.9rem;
+      font-weight: 500;
+      opacity: 0.9;
+      height: 20px;
+    }
+
+    /* Clear Button */
+    .clear-btn {
+      position: absolute;
+      top: 15px;
+      right: 15px;
+      background: rgba(0,0,0,0.1);
+      border: none;
+      color: white;
+      padding: 8px 12px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      z-index: 10;
+    }
+    
+    .loading-spinner {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid rgba(255,255,255,.3);
+      border-radius: 50%;
+      border-top-color: #fff;
+      animation: spin 1s ease-in-out infinite;
+      margin-left: 10px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+<script type="importmap">
+{
+  "imports": {
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "react": "https://esm.sh/react@^19.2.3",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+<body>
+  <div id="root"></div>
+  <!-- Updated script type for Babel -->
+  <script type="text/babel" data-type="module" src="./index.tsx"></script>
+<script type="module" src="/index.tsx"></script>
+</body>
+</html>
