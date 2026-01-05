@@ -36,16 +36,47 @@
             transition: background-color 0.3s ease;
         }
 
+        .text-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            margin-bottom: 20px;
+            gap: 10px;
+        }
+
         .text-display {
-            width: 90%;
-            min-height: 80px;
             font-size: 2rem;
             font-weight: bold;
             text-align: center;
-            margin-bottom: 20px;
             color: #fff;
             text-shadow: 0 2px 4px rgba(0,0,0,0.2);
             word-wrap: break-word;
+            flex: 1;
+        }
+
+        .replay-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid white;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            opacity: 0.8;
+            flex-shrink: 0; /* Prevent shrinking */
+        }
+        
+        .replay-btn:active {
+            background: rgba(255, 255, 255, 0.5);
+        }
+
+        .replay-btn svg {
+            width: 24px;
+            height: 24px;
+            fill: white;
         }
 
         .status-indicator {
@@ -141,13 +172,14 @@
     <!-- Top Half: Chinese (Opponent) -->
     <div class="half-screen top-half" id="topSection">
         <div class="status-indicator" id="statusCN">Ожидание...</div>
-        <div class="text-display" id="textCN">中文</div>
+        <div class="text-container">
+            <div class="replay-btn" onclick="speakLastCN()">
+                <svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+            </div>
+            <div class="text-display" id="textCN">中文</div>
+        </div>
         <div class="mic-button" id="btnCN">
-            <!-- Mic Icon -->
-            <svg viewBox="0 0 24 24">
-                <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
-                <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
-            </svg>
+            <svg viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>
         </div>
     </div>
 
@@ -156,13 +188,14 @@
 
     <!-- Bottom Half: Russian (User) -->
     <div class="half-screen bottom-half" id="bottomSection">
-        <div class="text-display" id="textRU">Русский</div>
+        <div class="text-container">
+            <div class="text-display" id="textRU">Русский</div>
+            <div class="replay-btn" onclick="speakLastRU()">
+                <svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+            </div>
+        </div>
         <div class="mic-button" id="btnRU">
-            <!-- Mic Icon -->
-            <svg viewBox="0 0 24 24">
-                <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
-                <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
-            </svg>
+            <svg viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>
         </div>
         <div class="status-indicator" id="statusRU" style="margin-top: 10px;">Нажми, чтобы говорить</div>
     </div>
@@ -186,6 +219,8 @@
         let recognition;
         let isRecognizing = false;
         let currentSource = ''; // 'RU' or 'CN'
+        let availableVoices = [];
+        let audioContextUnlocked = false;
 
         // --- Initialization ---
         function initSpeech() {
@@ -233,8 +268,8 @@
 
             recognition.onerror = function(event) {
                 console.error('Speech recognition error', event.error);
-                statusRU.textContent = "Ошибка: " + event.error;
-                statusCN.textContent = "Error";
+                statusRU.textContent = "Попробуйте еще раз";
+                statusCN.textContent = "Try again";
                 sectionRU.classList.remove('listening');
                 sectionCN.classList.remove('listening');
             };
@@ -242,7 +277,6 @@
 
         // --- Translation & TTS ---
         async function translateAndSpeak(text, sourceLang, targetLang, targetElement) {
-            // Show loading state
             targetElement.style.opacity = '0.5';
             
             try {
@@ -251,56 +285,141 @@
                 const response = await fetch(url);
                 const data = await response.json();
 
-                if (data.responseStatus === 200) {
-                    const translatedText = data.responseData.translatedText;
+                if (data.responseStatus === 200 || data.responseStatus === '200') {
+                    // API sometimes returns match as translatedText, sometimes responseData
+                    let translatedText = data.responseData.translatedText;
+                    
+                    // Decode HTML entities if present (common MyMemory issue)
+                    const tempDiv = document.createElement('div');
+                    tempDiv.innerHTML = translatedText;
+                    translatedText = tempDiv.textContent;
+
                     targetElement.textContent = translatedText;
                     targetElement.style.opacity = '1';
                     
                     // Speak the result
                     speak(translatedText, targetLang === 'zh-CN' ? LANG_CN : LANG_RU);
                 } else {
-                    targetElement.textContent = "Ошибка перевода";
+                    targetElement.textContent = "Ошибка перевода / Error";
                     targetElement.style.opacity = '1';
                 }
             } catch (error) {
                 console.error(error);
-                targetElement.textContent = "Нет сети";
+                targetElement.textContent = "Ошибка сети / Net Error";
                 targetElement.style.opacity = '1';
             }
         }
 
         function speak(text, lang) {
-            // Cancel any current speech
+            if (!text) return;
+            
+            console.log(`Attempting to speak: "${text}" in ${lang}`);
+
+            // 1. Cancel previous
             window.speechSynthesis.cancel();
 
+            // 2. Create Utterance
             const utterance = new SpeechSynthesisUtterance(text);
             utterance.lang = lang;
-            utterance.rate = 0.9; // Slightly slower for clarity
-            utterance.pitch = 1;
+            utterance.rate = 1.0;
+            utterance.pitch = 1.0;
 
-            // Try to select a better voice if available
-            const voices = window.speechSynthesis.getVoices();
-            const voice = voices.find(v => v.lang.includes(lang));
-            if (voice) {
-                utterance.voice = voice;
+            // 3. Voice Selection (Safe Mode)
+            availableVoices = window.speechSynthesis.getVoices();
+            let voice = availableVoices.find(v => v.lang === lang);
+            
+            if (!voice) {
+                voice = availableVoices.find(v => v.lang.replace('_', '-').toLowerCase() === lang.toLowerCase());
+            }
+            if (!voice) {
+                const shortLang = lang.split('-')[0];
+                voice = availableVoices.find(v => v.lang.replace('_', '-').startsWith(shortLang));
             }
 
+            if (voice) {
+                utterance.voice = voice;
+                console.log("Voice selected:", voice.name);
+            } else {
+                console.warn("No specific voice found. Letting browser choose default.");
+                // IMPORTANT: Do NOT set utterance.voice if undefined, it can cause crashes on some Androids
+            }
+
+            // 4. Error Handling
+            utterance.onerror = function(e) {
+                // Log the ACTUAL error property, not just the event object
+                console.error("TTS Error Event:", e);
+                console.error("TTS Error Code:", e.error); 
+                
+                let errMsg = "Audio Err: " + e.error;
+                if (e.error === 'not-allowed') errMsg = "Tap screen first!";
+                
+                if (lang === LANG_CN) {
+                    statusCN.textContent = errMsg;
+                } else {
+                    statusRU.textContent = errMsg;
+                }
+            };
+
+            utterance.onstart = function() {
+                console.log("TTS Started Successfully");
+            };
+
+            // 5. Force Resume & Speak
+            if (window.speechSynthesis.paused) {
+                window.speechSynthesis.resume();
+            }
             window.speechSynthesis.speak(utterance);
+            
+            // 6. Watchdog for "stuck" speech (Android fix)
+            // Sometimes resume() isn't enough, we need to call it again a bit later
+            setTimeout(() => {
+                if (window.speechSynthesis.pending) {
+                    console.log("Speech pending... forcing resume");
+                    window.speechSynthesis.resume();
+                }
+            }, 100);
         }
+        
+        // --- Manual Replay Functions ---
+        window.speakLastRU = function() {
+            const text = document.getElementById('textRU').textContent;
+            if (text && text !== 'Русский') speak(text, LANG_RU);
+        };
+
+        window.speakLastCN = function() {
+            const text = document.getElementById('textCN').textContent;
+            if (text && text !== '中文') speak(text, LANG_CN);
+        };
 
         // --- Event Handlers (Touch & Mouse) ---
         
+        // UNIVERSAL UNLOCKER: Runs on ANY interaction with the body
+        function unlockAudioEngine() {
+            if (!audioContextUnlocked && window.speechSynthesis) {
+                // Play silence to unlock
+                const utterance = new SpeechSynthesisUtterance('');
+                window.speechSynthesis.speak(utterance);
+                window.speechSynthesis.cancel(); // Stop it immediately
+                audioContextUnlocked = true;
+                console.log("Audio Engine Unlocked via user interaction");
+            }
+        }
+        
+        // Attach unlocker to the entire body for first touch
+        document.body.addEventListener('touchstart', unlockAudioEngine, {once:true});
+        document.body.addEventListener('click', unlockAudioEngine, {once:true});
+
+
         function startListening(lang, source) {
-            if (isRecognizing) return;
-            // Prime TTS engine on user interaction (mobile quirk fix)
-            window.speechSynthesis.resume(); 
+            unlockAudioEngine(); // Ensure unlocked
             
+            if (isRecognizing) return;
             currentSource = source;
             recognition.lang = lang;
             try {
                 recognition.start();
             } catch (e) {
-                console.log("Recognition already started");
+                console.log("Recognition already started or error");
             }
         }
 
@@ -324,7 +443,7 @@
                 stopListening();
             });
 
-            // Mouse events for desktop testing
+            // Mouse events for desktop
             btn.addEventListener('mousedown', () => {
                 btn.classList.add('active');
                 startListening(lang, source);
@@ -349,6 +468,7 @@
             textCN.textContent = "中文";
             statusRU.textContent = "Нажми, чтобы говорить";
             statusCN.textContent = "按住说话";
+            window.speechSynthesis.cancel();
         };
 
         // --- Boot ---
@@ -357,8 +477,15 @@
             setupButton(btnRU, LANG_RU, 'RU');
             setupButton(btnCN, LANG_CN, 'CN');
             
-            // Initial status text
-            statusCN.textContent = "按住说话"; // "Hold to speak" in Chinese
+            // Preload voices
+            if (window.speechSynthesis) {
+                const loadVoices = () => {
+                    availableVoices = window.speechSynthesis.getVoices();
+                    console.log("Voices loaded:", availableVoices.length);
+                };
+                window.speechSynthesis.onvoiceschanged = loadVoices;
+                loadVoices();
+            }
         });
 
     </script>
