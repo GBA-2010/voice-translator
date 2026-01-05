@@ -1,217 +1,366 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  
-  <!-- PWA Settings -->
-  <link rel="manifest" href="./manifest.json">
-  <meta name="theme-color" content="#4ECDC4">
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Translator">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Walkie-Talkie Translator (RU-ZH)</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none; /* Prevent text selection */
+            -webkit-tap-highlight-color: transparent;
+        }
 
-  <title>Russian-Chinese Voice Translator</title>
-  
-  <!-- Babel for in-browser compilation -->
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            height: 100vh;
+            width: 100vw;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background-color: #000;
+        }
 
-  <style>
-    :root {
-      --color-opponent: #FF6B6B; /* Soft Red for Top/Chinese */
-      --color-user: #4ECDC4;    /* Teal for Bottom/Russian */
-      --color-text: #FFFFFF;
-      --color-active: rgba(255, 255, 255, 0.2);
-    }
+        /* Common Styles */
+        .half-screen {
+            flex: 1;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            padding: 20px;
+            transition: background-color 0.3s ease;
+        }
 
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      user-select: none; /* Prevent text selection during hold */
-      -webkit-user-select: none;
-      -webkit-tap-highlight-color: transparent;
-    }
+        .text-display {
+            width: 90%;
+            min-height: 80px;
+            font-size: 2rem;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 20px;
+            color: #fff;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            word-wrap: break-word;
+        }
 
-    html, body {
-      height: 100%;
-      width: 100%;
-      overflow: hidden; /* Prevent scrolling completely */
-      overscroll-behavior: none; /* Disable pull-to-refresh on Android */
-      position: fixed; /* Lock the body in place */
-    }
+        .status-indicator {
+            font-size: 1rem;
+            color: rgba(255, 255, 255, 0.8);
+            margin-bottom: 10px;
+            height: 1.5rem;
+        }
 
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      background-color: #333;
-    }
+        .mic-button {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            border: 4px solid #fff;
+            background-color: rgba(255, 255, 255, 0.2);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            touch-action: none; /* Critical for long press on mobile */
+        }
 
-    #root {
-      height: 100%;
-      width: 100%;
-      display: flex;
-      flex-direction: column;
-    }
+        .mic-button svg {
+            width: 50px;
+            height: 50px;
+            fill: white;
+        }
 
-    /* Common Half Styles */
-    .split-half {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 20px;
-      position: relative;
-      transition: background-color 0.3s ease;
-      overflow: hidden;
-    }
+        .mic-button:active, .mic-button.active {
+            transform: scale(0.95);
+            background-color: rgba(255, 255, 255, 0.5);
+            box-shadow: 0 0 15px 5px rgba(255, 255, 255, 0.4);
+        }
 
-    /* Top Half (Chinese) */
-    .top-half {
-      background-color: var(--color-opponent);
-      transform: rotate(180deg); /* Rotate for opponent facing user */
-      border-top: 1px solid rgba(0,0,0,0.1);
-    }
+        /* Top Half (Chinese/Opponent) */
+        .top-half {
+            background-color: #FF6B6B;
+            /* Rotate the entire container for the opponent */
+            transform: rotate(180deg);
+            border-bottom: 2px solid rgba(0,0,0,0.1);
+        }
 
-    /* Bottom Half (Russian) */
-    .bottom-half {
-      background-color: var(--color-user);
-    }
+        /* Ripple effect for Top */
+        .top-half.listening {
+            animation: pulse-red 1.5s infinite;
+        }
 
-    /* Content Container */
-    .content-area {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      width: 100%;
-      text-align: center;
-      margin-bottom: 20px;
-    }
+        @keyframes pulse-red {
+            0% { background-color: #FF6B6B; }
+            50% { background-color: #ff8585; }
+            100% { background-color: #FF6B6B; }
+        }
 
-    .translation-text {
-      font-size: 2rem;
-      font-weight: bold;
-      color: var(--color-text);
-      word-break: break-word;
-      line-height: 1.2;
-      margin-bottom: 10px;
-      min-height: 2.4rem;
-    }
+        /* Bottom Half (Russian/User) */
+        .bottom-half {
+            background-color: #4ECDC4;
+        }
 
-    .original-text {
-      font-size: 1rem;
-      color: rgba(255, 255, 255, 0.8);
-      font-weight: normal;
-    }
+        /* Ripple effect for Bottom */
+        .bottom-half.listening {
+            animation: pulse-teal 1.5s infinite;
+        }
 
-    /* Push-to-Talk Button */
-    .mic-button {
-      width: 120px;
-      height: 120px;
-      border-radius: 50%;
-      background-color: rgba(255, 255, 255, 0.2);
-      border: 4px solid white;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-      touch-action: none; /* CRITICAL: Prevents browser gestures on button */
-    }
+        @keyframes pulse-teal {
+            0% { background-color: #4ECDC4; }
+            50% { background-color: #66d9d0; }
+            100% { background-color: #4ECDC4; }
+        }
 
-    .mic-button:active, .mic-button.active {
-      transform: scale(0.95);
-      background-color: rgba(255, 255, 255, 0.4);
-      box-shadow: 0 0 0 20px rgba(255, 255, 255, 0.1);
-    }
+        /* Clear Button */
+        .clear-btn {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 10;
+            background: rgba(0, 0, 0, 0.5);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            cursor: pointer;
+        }
 
-    .mic-button.listening {
-      animation: ripple 1.5s infinite;
-      background-color: #ff4757; /* Indicator color when listening */
-      border-color: #ff4757;
-    }
-    
-    .bottom-half .mic-button.listening {
-      background-color: #2f3542;
-      border-color: #2f3542;
-    }
-
-    @keyframes ripple {
-      0% {
-        box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.4);
-      }
-      70% {
-        box-shadow: 0 0 0 30px rgba(255, 255, 255, 0);
-      }
-      100% {
-        box-shadow: 0 0 0 0 rgba(255, 255, 255, 0);
-      }
-    }
-
-    .mic-icon {
-      width: 50px;
-      height: 50px;
-      fill: white;
-      pointer-events: none;
-    }
-
-    .status-label {
-      margin-top: 15px;
-      color: white;
-      font-size: 0.9rem;
-      font-weight: 500;
-      opacity: 0.9;
-      height: 20px;
-    }
-
-    /* Clear Button */
-    .clear-btn {
-      position: absolute;
-      top: 15px;
-      right: 15px;
-      background: rgba(0,0,0,0.1);
-      border: none;
-      color: white;
-      padding: 8px 12px;
-      border-radius: 20px;
-      font-size: 0.8rem;
-      cursor: pointer;
-      z-index: 10;
-    }
-    
-    .loading-spinner {
-      display: inline-block;
-      width: 20px;
-      height: 20px;
-      border: 3px solid rgba(255,255,255,.3);
-      border-radius: 50%;
-      border-top-color: #fff;
-      animation: spin 1s ease-in-out infinite;
-      margin-left: 10px;
-    }
-
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-  </style>
-<script type="importmap">
-{
-  "imports": {
-    "react/": "https://esm.sh/react@^19.2.3/",
-    "react": "https://esm.sh/react@^19.2.3",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/"
-  }
-}
-</script>
-<link rel="stylesheet" href="/index.css">
+    </style>
 </head>
 <body>
-  <div id="root"></div>
-  <!-- Updated script type for Babel -->
-  <script type="text/babel" data-type="module" src="./index.tsx"></script>
-<script type="module" src="/index.tsx"></script>
+
+    <!-- Top Half: Chinese (Opponent) -->
+    <div class="half-screen top-half" id="topSection">
+        <div class="status-indicator" id="statusCN">Ожидание...</div>
+        <div class="text-display" id="textCN">中文</div>
+        <div class="mic-button" id="btnCN">
+            <!-- Mic Icon -->
+            <svg viewBox="0 0 24 24">
+                <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+                <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+            </svg>
+        </div>
+    </div>
+
+    <!-- Center Clear Button -->
+    <button class="clear-btn" onclick="clearHistory()">Очистить / Clear</button>
+
+    <!-- Bottom Half: Russian (User) -->
+    <div class="half-screen bottom-half" id="bottomSection">
+        <div class="text-display" id="textRU">Русский</div>
+        <div class="mic-button" id="btnRU">
+            <!-- Mic Icon -->
+            <svg viewBox="0 0 24 24">
+                <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+                <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+            </svg>
+        </div>
+        <div class="status-indicator" id="statusRU" style="margin-top: 10px;">Нажми, чтобы говорить</div>
+    </div>
+
+    <script>
+        // --- Configuration ---
+        const LANG_RU = 'ru-RU';
+        const LANG_CN = 'zh-CN';
+        
+        // --- DOM Elements ---
+        const btnRU = document.getElementById('btnRU');
+        const btnCN = document.getElementById('btnCN');
+        const textRU = document.getElementById('textRU');
+        const textCN = document.getElementById('textCN');
+        const sectionRU = document.getElementById('bottomSection');
+        const sectionCN = document.getElementById('topSection');
+        const statusRU = document.getElementById('statusRU');
+        const statusCN = document.getElementById('statusCN');
+
+        // --- State ---
+        let recognition;
+        let isRecognizing = false;
+        let currentSource = ''; // 'RU' or 'CN'
+
+        // --- Initialization ---
+        function initSpeech() {
+            if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+                alert('Ваш браузер не поддерживает распознавание речи. Попробуйте Chrome на Android.');
+                return;
+            }
+
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            recognition = new SpeechRecognition();
+            recognition.continuous = false;
+            recognition.interimResults = false;
+            recognition.maxAlternatives = 1;
+
+            recognition.onstart = function() {
+                isRecognizing = true;
+                if (currentSource === 'RU') {
+                    sectionRU.classList.add('listening');
+                    statusRU.textContent = "Слушаю...";
+                } else {
+                    sectionCN.classList.add('listening');
+                    statusCN.textContent = "正在聆听...";
+                }
+            };
+
+            recognition.onend = function() {
+                isRecognizing = false;
+                sectionRU.classList.remove('listening');
+                sectionCN.classList.remove('listening');
+                statusRU.textContent = "Нажми, чтобы говорить";
+                statusCN.textContent = "按住说话";
+            };
+
+            recognition.onresult = function(event) {
+                const transcript = event.results[0][0].transcript;
+                
+                if (currentSource === 'RU') {
+                    textRU.textContent = transcript;
+                    translateAndSpeak(transcript, 'ru', 'zh-CN', textCN);
+                } else {
+                    textCN.textContent = transcript;
+                    translateAndSpeak(transcript, 'zh', 'ru-RU', textRU);
+                }
+            };
+
+            recognition.onerror = function(event) {
+                console.error('Speech recognition error', event.error);
+                statusRU.textContent = "Ошибка: " + event.error;
+                statusCN.textContent = "Error";
+                sectionRU.classList.remove('listening');
+                sectionCN.classList.remove('listening');
+            };
+        }
+
+        // --- Translation & TTS ---
+        async function translateAndSpeak(text, sourceLang, targetLang, targetElement) {
+            // Show loading state
+            targetElement.style.opacity = '0.5';
+            
+            try {
+                // Using MyMemory API
+                const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${sourceLang}|${targetLang}`;
+                const response = await fetch(url);
+                const data = await response.json();
+
+                if (data.responseStatus === 200) {
+                    const translatedText = data.responseData.translatedText;
+                    targetElement.textContent = translatedText;
+                    targetElement.style.opacity = '1';
+                    
+                    // Speak the result
+                    speak(translatedText, targetLang === 'zh-CN' ? LANG_CN : LANG_RU);
+                } else {
+                    targetElement.textContent = "Ошибка перевода";
+                    targetElement.style.opacity = '1';
+                }
+            } catch (error) {
+                console.error(error);
+                targetElement.textContent = "Нет сети";
+                targetElement.style.opacity = '1';
+            }
+        }
+
+        function speak(text, lang) {
+            // Cancel any current speech
+            window.speechSynthesis.cancel();
+
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = lang;
+            utterance.rate = 0.9; // Slightly slower for clarity
+            utterance.pitch = 1;
+
+            // Try to select a better voice if available
+            const voices = window.speechSynthesis.getVoices();
+            const voice = voices.find(v => v.lang.includes(lang));
+            if (voice) {
+                utterance.voice = voice;
+            }
+
+            window.speechSynthesis.speak(utterance);
+        }
+
+        // --- Event Handlers (Touch & Mouse) ---
+        
+        function startListening(lang, source) {
+            if (isRecognizing) return;
+            // Prime TTS engine on user interaction (mobile quirk fix)
+            window.speechSynthesis.resume(); 
+            
+            currentSource = source;
+            recognition.lang = lang;
+            try {
+                recognition.start();
+            } catch (e) {
+                console.log("Recognition already started");
+            }
+        }
+
+        function stopListening() {
+            if (isRecognizing) {
+                recognition.stop();
+            }
+        }
+
+        function setupButton(btn, lang, source) {
+            // Touch events for mobile
+            btn.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                btn.classList.add('active');
+                startListening(lang, source);
+            });
+
+            btn.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                btn.classList.remove('active');
+                stopListening();
+            });
+
+            // Mouse events for desktop testing
+            btn.addEventListener('mousedown', () => {
+                btn.classList.add('active');
+                startListening(lang, source);
+            });
+
+            btn.addEventListener('mouseup', () => {
+                btn.classList.remove('active');
+                stopListening();
+            });
+            
+            btn.addEventListener('mouseleave', () => {
+                 if(btn.classList.contains('active')) {
+                     btn.classList.remove('active');
+                     stopListening();
+                 }
+            });
+        }
+
+        // --- Clear History ---
+        window.clearHistory = function() {
+            textRU.textContent = "Русский";
+            textCN.textContent = "中文";
+            statusRU.textContent = "Нажми, чтобы говорить";
+            statusCN.textContent = "按住说话";
+        };
+
+        // --- Boot ---
+        window.addEventListener('load', () => {
+            initSpeech();
+            setupButton(btnRU, LANG_RU, 'RU');
+            setupButton(btnCN, LANG_CN, 'CN');
+            
+            // Initial status text
+            statusCN.textContent = "按住说话"; // "Hold to speak" in Chinese
+        });
+
+    </script>
 </body>
 </html>
